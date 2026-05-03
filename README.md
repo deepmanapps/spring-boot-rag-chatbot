@@ -160,8 +160,3 @@ src/
 | `pinecone.index` | `PINECONE_INDEX` | Pinecone index name |
 | `spring.servlet.multipart.max-file-size` | — | Max upload size (default: 10MB) |
 
----
-
-## 📝 License
-
-This project is open source and available under the [MIT License](LICENSE).
