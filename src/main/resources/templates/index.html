@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spring Boot RAG Chat</title>
+  <!-- HTMX -->
+  <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+  <!-- Alpine.js -->
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-slate-50 flex h-screen font-sans text-slate-900 overflow-hidden">
+
+  <!-- Sidebar for Desktop -->
+  <aside class="w-72 bg-white border-r border-slate-200 hidden md:flex flex-col">
+    <div class="p-6 border-b border-slate-100">
+      <div class="flex items-center gap-2 mb-2">
+        <div class="w-8 h-8 bg-indigo-600 rounded flex items-center justify-center">
+          <div class="w-4 h-4 border-2 border-white rounded-sm"></div>
+        </div>
+        <h1 class="font-semibold text-lg tracking-tight">Document Power Center</h1>
+      </div>
+    </div>
+
+    <div class="p-6 flex-1">
+      <!-- File Upload Section -->
+      <div class="mb-8">
+        <p class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-3">Knowledge Base</p>
+        <form id="upload-form" hx-post="/upload" hx-encoding="multipart/form-data" hx-target="#upload-status"
+          hx-indicator="#upload-spinner">
+
+          <div
+            class="border-2 border-dashed border-slate-200 rounded-lg p-4 mb-4 hover:border-indigo-400 hover:bg-indigo-50 transition-colors">
+            <svg class="w-6 h-6 mx-auto mb-2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+            </svg>
+            <label class="block mb-2 text-xs font-medium text-slate-500 text-center cursor-pointer"
+              for="file_input">Upload PDF/Text</label>
+            <input
+              class="block w-full text-[10px] text-slate-500 file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-[10px] file:font-semibold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200 cursor-pointer focus:outline-none"
+              id="file_input" type="file" name="file" accept=".pdf">
+          </div>
+
+          <button type="submit"
+            class="w-full text-white bg-slate-900 hover:bg-slate-800 focus:ring-4 focus:ring-slate-300 font-medium rounded-lg text-xs px-5 py-2.5 mb-2 focus:outline-none flex justify-center items-center transition-colors">
+            <span id="upload-spinner" class="htmx-indicator mr-2">
+              <svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none"
+                viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                </path>
+              </svg>
+            </span>
+            Upload & Index
+          </button>
+        </form>
+
+        <div id="upload-status" class="mt-4 text-xs tracking-wide break-words text-slate-600"></div>
+      </div>
+    </div>
+
+    <div class="mt-auto p-6 border-t border-slate-100">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-full bg-slate-200"></div>
+        <div class="flex flex-col">
+          <span class="text-xs font-bold">Deepmanapps</span>
+          <span class="text-[10px] text-slate-500">Pinecone Index: Active</span>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content: Chat Interface -->
+  <main class="flex-1 flex flex-col bg-white relative">
+
+    <!-- Header Bar -->
+    <header class="h-16 border-b border-slate-100 flex items-center justify-between px-8 bg-white z-10 sticky top-0">
+      <div class="flex items-center gap-4">
+        <div class="h-2 w-2 rounded-full bg-green-500"></div>
+        <h2 class="text-sm font-medium">Simple RAG CHAT Application</h2>
+      </div>
+      <div class="flex gap-3">
+        <button
+          class="px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 border border-slate-200 rounded-md">Clear
+          Memory</button>
+        <button class="px-3 py-1.5 text-xs font-medium text-white bg-slate-900 hover:bg-slate-800 rounded-md">Export
+          Logs</button>
+      </div>
+    </header>
+
+    <!-- Chat Container -->
+    <div id="chat-container" class="flex-1 p-8 overflow-y-auto space-y-8"
+      x-data="{ autoScroll: () => { $el.scrollTop = $el.scrollHeight } }" @htmx:after-swap.camel="autoScroll()">
+
+      <!-- Welcome Message -->
+      <div class="flex gap-4 max-w-3xl">
+        <div class="w-8 h-8 rounded bg-indigo-100 flex items-center justify-center flex-shrink-0">
+          <span class="text-[10px] font-bold text-indigo-600">AI</span>
+        </div>
+        <div class="space-y-2">
+          <p class="text-sm leading-relaxed text-slate-700">
+            Hello! I'm your document assistant. Upload a PDF from the sidebar, and then ask me questions about it!
+          </p>
+          <div class="flex gap-2">
+            <span class="text-[10px] px-2 py-0.5 bg-slate-100 rounded-full text-slate-500">Pinecone RAG Active</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Input Area -->
+    <div class="p-8 bg-white border-t border-slate-100" x-data="{ message: '' }">
+      <div class="relative max-w-4xl mx-auto">
+        <form hx-post="/chat" hx-target="#chat-container" hx-swap="beforeend" hx-indicator="#send-indicator"
+          @submit="setTimeout(() => message = '', 10)" class="relative flex items-end">
+
+          <textarea name="message" x-model="message" required rows="1" placeholder="Ask anything about your files..."
+            class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 pr-32 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 resize-none max-h-32 overflow-y-auto"
+            @keydown.enter.prevent="if(!$event.shiftKey && message.trim() !== '') { $el.closest('form').dispatchEvent(new Event('submit', {cancelable: true, bubbles: true})) }"
+            x-ref="textarea"
+            @input="$refs.textarea.style.height = 'auto'; $refs.textarea.style.height = $refs.textarea.scrollHeight + 'px'"></textarea>
+
+          <div class="absolute right-2 top-2 flex items-center gap-2">
+            <button type="submit"
+              class="p-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50"
+              :disabled="message.trim() === ''">
+              <svg id="send-btn-icon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18">
+                </path>
+              </svg>
+              <svg id="send-indicator" class="htmx-indicator animate-spin h-4 w-4 text-white"
+                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                </path>
+              </svg>
+            </button>
+          </div>
+        </form>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- HTMX Fragments -->
+  <div th:fragment="chat-message" th:if="${message != null}" class="contents">
+    <!-- User Message -->
+    <div class="flex gap-4 max-w-3xl ml-auto flex-row-reverse">
+      <div class="w-8 h-8 rounded bg-slate-900 flex items-center justify-center flex-shrink-0">
+        <span class="text-[10px] font-bold text-white">U</span>
+      </div>
+      <div class="bg-slate-100 p-4 rounded-2xl rounded-tr-none">
+        <p class="text-sm leading-relaxed text-slate-800 whitespace-pre-wrap" th:text="${message}">
+          Message
+        </p>
+      </div>
+    </div>
+
+    <!-- AI Response -->
+    <div class="flex gap-4 max-w-3xl">
+      <div class="w-8 h-8 rounded bg-indigo-100 flex items-center justify-center flex-shrink-0">
+        <span class="text-[10px] font-bold text-indigo-600">AI</span>
+      </div>
+      <div class="space-y-2">
+        <p class="text-sm leading-relaxed text-slate-700 whitespace-pre-wrap" th:text="${response}">
+          Response
+        </p>
+        <div class="flex gap-2">
+          <span class="text-[10px] px-2 py-0.5 bg-slate-100 rounded-full text-slate-500">LangChain4j Response</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    .htmx-indicator {
+      display: none;
+    }
+
+    .htmx-request .htmx-indicator {
+      display: inline-block;
+    }
+
+    .htmx-request.htmx-indicator {
+      display: inline-block;
+    }
+
+    form.htmx-request #send-btn-icon {
+      display: none;
+    }
+  </style>
+</body>
+
+</html>
